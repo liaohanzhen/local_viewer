@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,user-scalable=no" />
+    <title>视频播放</title>
+    <link href="../build/video-js.css" rel="stylesheet">
+    <style>
+        .pageContent {
+            width: 100%;
+            height: 100%;
+            margin: 0px;
+            padding: 0px;
+        }
+
+        /* #kltVideo {
+            margin: 0px;
+            padding: 0px;
+        } */
+    </style>
+
+</head>
+
+<body>
+    <div class="pageContent">
+        <video id="kltVideo" oncontextmenu="return false;" controlsList="nodownload" class="video-js vjs-default-skin vjs-big-play-centered vjs-16-9" controls preload="auto"
+        poster="">
+        </video>
+    </div>
+
+    <script src="../build/video.min.js"></script>
+    <script src="../build/videojs-landscape-fullscreen.min.js"></script>
+    <script>
+        // 获得传入参数
+        var file = getQueryString('file');
+        var filetype = getQueryString('type');
+        var filetitle = getQueryString('title');
+
+        var videotype = "video/mp4";
+        // 解码文件地址
+        var videourl = atob(decodeURIComponent(file));
+        var filetitle = decodeURIComponent(filetitle);
+
+        if (filetype == 'm3u8') {
+            videourl = getUrlResponse(videourl);
+            videotype = "application/x-mpegURL";
+        }
+
+        var myPlayer = videojs('kltVideo', {
+            bigPlayButton: true,
+            textTrackDisplay: false,
+            posterImage: true,
+            errorDisplay: true,
+            controlBar: true,
+            title: filetitle,
+            playbackRates: [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2],
+            // oncontextmenu: "return false;",
+            // height: document.documentElement.clientHeight,
+            // width: document.documentElement.clientWidth,
+            sources: [{
+                src: videourl,
+                type: videotype  //m3u8: "application/x-mpegURL", mp4:"video/mp4"
+            }]
+        }, function () {
+            // console.log(this)
+            this.on('loadedmetadata', function () {
+                // console.log('loadedmetadata');
+                //加载到元数据后开始播放视频
+                startVideo();
+            })
+
+            // this.on('ended', function () {
+            //     console.log('ended')
+            // })
+            // this.on('firstplay', function () {
+            //     console.log('firstplay')
+            // })
+            // this.on('loadstart', function () {
+            //     //开始加载
+            //     console.log('loadstart')
+            // })
+            // this.on('loadeddata', function () {
+            //     console.log('loadeddata')
+            // })
+            // this.on('seeking', function () {
+            //     //正在去拿视频流的路上
+            //     console.log('seeking')
+            // })
+            // this.on('seeked', function () {
+            //     //已经拿到视频流,可以播放
+            //     console.log('seeked')
+            // })
+            // this.on('waiting', function () {
+            //     console.log('waiting')
+            // })
+            // this.on('pause', function () {
+            //     console.log('pause')
+            // })
+            // this.on('play', function () {
+            //     console.log('play')
+            // })
+
+        });
+
+        var isVideoBreak;
+        myPlayer.landscapeFullscreen();
+        function startVideo() {
+
+            myPlayer.play();
+
+            //微信内全屏支持
+            // document.getElementById('kltVideo').style.width = window.screen.width + "px";
+            // document.getElementById('kltVideo').style.height = window.screen.height + "px";
+
+
+            //判断开始播放视频，移除高斯模糊等待层
+            var isVideoPlaying = setInterval(function () {
+                var currentTime = myPlayer.currentTime();
+                if (currentTime > 0) {
+                    // $('.vjs-poster').remove();
+                    clearInterval(isVideoPlaying);
+                }
+            }, 200)
+
+            //判断视频是否卡住，卡主3s重新load视频
+            var lastTime = -1,
+                tryTimes = 0;
+
+            clearInterval(isVideoBreak);
+            isVideoBreak = setInterval(function () {
+                var currentTime = myPlayer.currentTime();
+                // console.log('currentTime' + currentTime + 'lastTime' + lastTime);
+
+                if (currentTime == lastTime) {
+                    //此时视频已卡主3s
+                    //设置当前播放时间为超时时间，此时videojs会在play()后把currentTime设置为0
+                    myPlayer.currentTime(currentTime + 10000);
+                    myPlayer.play();
+
+                    //尝试5次播放后，如仍未播放成功提示刷新
+                    if (++tryTimes > 5) {
+                        alert('您的网速有点慢，刷新下试试');
+                        tryTimes = 0;
+                    }
+                } else {
+                    lastTime = currentTime;
+                    tryTimes = 0;
+                }
+            }, 3000)
+
+        }
+
+        //url处理数据的文件地址（c# url通常是处理前台数据的ashx文件在服务器的地址）
+        function getUrlResponse(url) {
+            var xhttp;
+            if (window.XMLHttpRequest)//code for all new browsers.
+                xhttp = new XMLHttpRequest();
+            else if (window.ActiveXObject)//code for IE5 and IE6
+                xhttp = new ActiveObject("Microsoft.XMLHTTP");
+            else
+                alert("Your browser does not support XMLHTTP.");
+            xhttp.open("POST", url, false);//false 表示同步 
+            xhttp.send();
+            if (xhttp.status.toString() == "200") {
+                var rurl = xhttp.responseURL;
+                return rurl.toString();
+            }
+            else {
+                return xhttp.responseText;
+            }
+        }
+
+        function getQueryVariable(variable) {
+            var query = window.location.search.substring(1);
+            var vars = query.split("&");
+            for (var i = 0; i < vars.length; i++) {
+                var pair = vars[i].split("=");
+                if (pair[0] == variable) { return pair[1]; }
+            }
+            return (false);
+        }
+
+        function getQueryString(variable) {
+            var reg = new RegExp("(^|&amp;)" + variable + "=([^&]*)(&|$)", "i");
+            var r = window.location.search.substr(1).match(reg);
+            if (r != null) return unescape(r[2]); 
+            return null;
+        }
+
+    </script>
+
+</html>
